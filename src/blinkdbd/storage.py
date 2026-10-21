@@ -177,6 +177,33 @@ class Storage:
 
         return self._timed("delete", remove)
 
+    def list_datasets(self) -> list[str]:
+        def read() -> list[str]:
+            with self._lock:
+                rows = self._db.execute(
+                    "SELECT DISTINCT dataset FROM kv_entries ORDER BY dataset"
+                ).fetchall()
+            return [row[0] for row in rows]
+
+        return self._timed("list_datasets", read)
+
+    def list_keys(self, dataset: str, *, limit: int = 100, offset: int = 0) -> list[bytes]:
+        self._validate(dataset, b"")
+        if not 1 <= limit <= 1000:
+            raise ValueError("Key-list limit must be between 1 and 1000")
+        if offset < 0:
+            raise ValueError("Key-list offset must not be negative")
+
+        def read() -> list[bytes]:
+            with self._lock:
+                rows = self._db.execute(
+                    "SELECT key FROM kv_entries WHERE dataset=? ORDER BY key LIMIT ? OFFSET ?",
+                    (dataset, limit, offset),
+                ).fetchall()
+            return [bytes(row[0]) for row in rows]
+
+        return self._timed("list_keys", read)
+
     def transact(self, mutations: list[dict[str, object]]) -> None:
         normalized: list[tuple[str, str, bytes, bytes | None]] = []
         for mutation in mutations:

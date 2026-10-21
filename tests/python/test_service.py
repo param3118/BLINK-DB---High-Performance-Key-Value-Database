@@ -2,13 +2,18 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import io
 import json
 import sqlite3
+import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
+from unittest.mock import patch
 
 from clients.python.blinkdb_client import HttpClient, RespClient
+from blinkdbd.cli import main as cli_main
 from blinkdbd.config import Settings, validate_settings
 from blinkdbd.http_api import HttpProtocol
 from blinkdbd.metrics import Metrics
@@ -66,6 +71,59 @@ class StorageTests(unittest.TestCase):
         self.assertEqual(self.storage.get("alpha", b"\x00\xff"), b"")
         self.assertEqual(self.storage.get("beta", b"\x00\xff"), b"\x00\xfe")
         self.assertIsNone(self.storage.get("missing", b"\x00\xff"))
+
+    def test_list_datasets_and_paginated_keys(self) -> None:
+        self.storage.set("alpha", b"first", b"1")
+        self.storage.set("alpha", b"\x00\xff", b"2")
+        self.storage.set("beta", b"other", b"3")
+        self.assertEqual(self.storage.list_datasets(), ["alpha", "beta"])
+        self.assertEqual(self.storage.list_keys("alpha", limit=1), [b"\x00\xff"])
+        self.assertEqual(self.storage.list_keys("alpha", limit=1, offset=1), [b"first"])
+        self.assertEqual(self.storage.list_keys("empty-dataset"), [])
+        with self.assertRaisesRegex(ValueError, "limit"):
+            self.storage.list_keys("alpha", limit=1001)
+
+    def test_cli_can_inspect_live_database(self) -> None:
+        self.storage.set("shop-api", b"order:42", b'{"status":"saved"}')
+        self.storage.set("shop-api", b"\x00\xff", b"\x00\xfe")
+        output = io.StringIO()
+        with patch.object(
+            sys,
+            "argv",
+            ["blinkdbd", "--data-dir", self.temp.name, "--list-datasets"],
+        ), redirect_stdout(output):
+            self.assertEqual(cli_main(), 0)
+        self.assertEqual(json.loads(output.getvalue()), {"datasets": ["shop-api"]})
+
+        output = io.StringIO()
+        with patch.object(
+            sys,
+            "argv",
+            ["blinkdbd", "--data-dir", self.temp.name, "--get", "shop-api", "order:42"],
+        ), redirect_stdout(output):
+            self.assertEqual(cli_main(), 0)
+        result = json.loads(output.getvalue())
+        self.assertTrue(result["found"])
+        self.assertEqual(result["value_text"], '{"status":"saved"}')
+
+        output = io.StringIO()
+        with patch.object(
+            sys,
+            "argv",
+            [
+                "blinkdbd",
+                "--data-dir",
+                self.temp.name,
+                "--get-base64",
+                "shop-api",
+                "AP8=",
+            ],
+        ), redirect_stdout(output):
+            self.assertEqual(cli_main(), 0)
+        result = json.loads(output.getvalue())
+        self.assertTrue(result["found"])
+        self.assertEqual(result["key_base64"], "AP8=")
+        self.assertEqual(result["value_base64"], "AP4=")
 
     def test_transaction_and_backup_restore(self) -> None:
         self.storage.transact(

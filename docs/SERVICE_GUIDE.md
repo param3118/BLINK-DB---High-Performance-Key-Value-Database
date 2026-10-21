@@ -451,6 +451,38 @@ schema version before replacing the active database contents. Keep backups
 outside the live data directory, restrict their access, and periodically test
 restores to a separate data directory.
 
+## Browse your project data
+
+Use the `blinkdbd` CLI on the machine running BlinkDB to view dataset names,
+keys, and individual values. These are local owner tools; they do not add a
+public browsing endpoint. Use the same data directory as the running service.
+For Docker, run the commands with `docker compose exec blinkdb` and `/data`:
+
+```powershell
+# Native service
+blinkdbd --data-dir "$env:LOCALAPPDATA\BlinkDB\data" --list-datasets
+blinkdbd --data-dir "$env:LOCALAPPDATA\BlinkDB\data" --list-keys shop-api
+blinkdbd --data-dir "$env:LOCALAPPDATA\BlinkDB\data" --get shop-api order:42
+
+# Docker Compose service
+docker compose exec blinkdb blinkdbd --data-dir /data --list-datasets
+docker compose exec blinkdb blinkdbd --data-dir /data --list-keys shop-api
+docker compose exec blinkdb blinkdbd --data-dir /data --get shop-api order:42
+```
+
+`--list-keys` shows up to 100 keys by default; use `--limit` (maximum 1000)
+and `--offset` to page through a large dataset. Keys are returned as base64
+and, when valid UTF-8, as readable text. `--get` accepts a text/UTF-8 key;
+use `--get-base64` with the listed base64 key for a binary key. Both commands
+print the value as base64 plus readable text when it is valid UTF-8. This
+means arbitrary binary values remain inspectable without corrupting terminal
+output. A missing key is reported with `"found": false`.
+
+Each project should continue using its own dataset name (for example,
+`shop-api` or `inventory-app`). The owner CLI can inspect all of them. Keep the
+database directory/volume private to the machine or container host, and do not
+edit the SQLite file directly while BlinkDB is running.
+
 ## Current limitations
 
 - Single node, single service process; multi-process write coordination is not

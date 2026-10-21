@@ -48,6 +48,12 @@ def settings_from_args() -> tuple[Settings, argparse.Namespace]:
     operations.add_argument("--backup")
     operations.add_argument("--restore")
     operations.add_argument("--check", action="store_true")
+    operations.add_argument("--list-datasets", action="store_true")
+    operations.add_argument("--list-keys", metavar="DATASET")
+    operations.add_argument("--get", nargs=2, metavar=("DATASET", "KEY"))
+    operations.add_argument("--get-base64", nargs=2, metavar=("DATASET", "KEY_BASE64"))
+    parser.add_argument("--limit", type=int, default=100, help="Maximum keys to show")
+    parser.add_argument("--offset", type=int, default=0, help="Key-list offset")
     args = parser.parse_args()
 
     settings = Settings(

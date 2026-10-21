@@ -91,6 +91,12 @@ with RespClient.from_env(dataset="shop-api") as db:
 `RespClient.from_env()` also accepts `BLINKDB_RESP_PORT` (default `6379`).
 Installing the standalone client does not install or run the BlinkDB server.
 
+To inspect your stored data on the BlinkDB host, use
+`blinkdbd --data-dir <data-folder> --list-datasets`, then
+`--list-keys <dataset>` and `--get <dataset> <text-key>`. For Docker, run those
+commands through `docker compose exec blinkdb blinkdbd --data-dir /data`.
+See the service guide for pagination and binary-key examples.
+
 For a project on another computer, set `BLINKDB_HOST` to the database host's
 private-network name, enable TLS, and limit access to a trusted private
 network. Do not expose the ports to the public internet. The host must stay

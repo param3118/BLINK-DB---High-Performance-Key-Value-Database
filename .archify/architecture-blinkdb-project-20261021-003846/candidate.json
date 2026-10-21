@@ -1,0 +1,181 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "BlinkDB — system architecture and flows",
+    "output": ".archify/architecture-blinkdb-project-20261021-003846/blinkdb-project.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    {
+      "id": "redis-clients",
+      "type": "external",
+      "label": "Redis-compatible clients",
+      "sublabel": "redis-cli / RESP clients",
+      "pos": [40, 80],
+      "size": [160, 76]
+    },
+    {
+      "id": "benchmark-clients",
+      "type": "external",
+      "label": "Benchmark tooling",
+      "sublabel": "redis-benchmark + shell script",
+      "pos": [255, 300],
+      "size": [180, 80]
+    },
+    {
+      "id": "tcp-workers",
+      "type": "backend",
+      "label": "TCP server + workers",
+      "sublabel": "C++ threads · port 6379 · epoll",
+      "tag": "4 workers",
+      "pos": [250, 80],
+      "size": [190, 86]
+    },
+    {
+      "id": "resp-handler",
+      "type": "backend",
+      "label": "RESP parser + command handler",
+      "sublabel": "buffers, parses, dispatches, serializes",
+      "pos": [500, 80],
+      "size": [210, 90]
+    },
+    {
+      "id": "storage-engine",
+      "type": "database",
+      "label": "StorageEngine",
+      "sublabel": "C++17 · SQLite WAL · synchronous FULL",
+      "pos": [790, 80],
+      "size": [220, 96]
+    },
+    {
+      "id": "sqlite-file",
+      "type": "database",
+      "label": "blinkdb.sqlite3",
+      "sublabel": "indexed (dataset, key) BLOB records",
+      "pos": [1080, 80],
+      "size": [205, 86]
+    },
+    {
+      "id": "backup-file",
+      "type": "database",
+      "label": "Consistent backup",
+      "sublabel": "SQLite online backup API",
+      "pos": [790, 300],
+      "size": [220, 86]
+    },
+    {
+      "id": "standalone-test",
+      "type": "backend",
+      "label": "Storage test / demo",
+      "sublabel": "binary · empty · datasets · backup",
+      "pos": [500, 300],
+      "size": [205, 86]
+    }
+  ],
+  "connections": [
+    {
+      "id": "client-request",
+      "from": "redis-clients",
+      "to": "tcp-workers",
+      "label": "RESP TCP :6379 · replies on same socket",
+      "variant": "emphasis",
+      "route": "straight",
+      "labelDy": -38
+    },
+    {
+      "id": "receive-dispatch",
+      "from": "tcp-workers",
+      "to": "resp-handler",
+      "label": "accept · epoll · recv",
+      "variant": "emphasis",
+      "route": "straight",
+      "labelDy": -38
+    },
+    {
+      "id": "command-to-engine",
+      "from": "resp-handler",
+      "to": "storage-engine",
+      "label": "SET / GET / DEL · result or status",
+      "variant": "emphasis",
+      "route": "straight",
+      "labelDy": -38
+    },
+    {
+      "id": "engine-to-sqlite",
+      "from": "storage-engine",
+      "to": "sqlite-file",
+      "label": "SQLite indexed BLOB rows",
+      "route": "straight",
+      "labelDy": -46
+    },
+    {
+      "id": "sqlite-backup",
+      "from": "storage-engine",
+      "to": "backup-file",
+      "label": "consistent backup / restore",
+      "variant": "dashed",
+      "route": "straight",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "benchmark-request",
+      "from": "benchmark-clients",
+      "to": "tcp-workers",
+      "label": "SET/GET load",
+      "variant": "dashed",
+      "labelDx": 70
+    },
+    {
+      "id": "standalone-engine-call",
+      "from": "standalone-test",
+      "to": "storage-engine",
+      "label": "API calls",
+      "variant": "dashed",
+      "labelDx": 70
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Request and command flow",
+      "items": [
+        "Four worker threads each create a non-blocking listening socket and epoll loop on TCP port 6379; SO_REUSEPORT is enabled when available.",
+        "Client bytes are accumulated and parsed as RESP arrays of bulk strings; non-array input falls back to whitespace tokenization. Incomplete commands wait for more bytes, and buffered pipelined commands are processed in sequence.",
+        "SET key value → durable SQLite write → +OK. GET key → bulk string, including a valid zero-length value, or RESP null ($-1) only when missing. DEL key → integer 1 or 0. PING → +PONG.",
+        "CONFIG GET returns hard-coded compatibility values: multi-thread=yes, maxmemory=1, appendonly=no, save='', requirepass='', timeout=0, databases=16. Unknown commands or invalid argument counts return a RESP error."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Storage and persistence behavior",
+      "items": [
+        "SQLite stores binary keys/values as BLOBs under a composite (dataset, key) primary key; datasets have separate key spaces.",
+        "Writes use SQLite WAL mode and synchronous=FULL. The API distinguishes a missing key (optional empty) from a stored empty byte sequence.",
+        "transact() applies a batch of SET/DEL mutations inside BEGIN IMMEDIATE/COMMIT; failures trigger rollback. Calls on one StorageEngine instance are serialized by a mutex.",
+        "Options bound dataset-name, key, and value sizes; the SQLite page cache can be limited and max_database_size_bytes caps main-database pages. This does not cap all process memory or transient WAL/backup growth."
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Concurrency and implementation technology",
+      "items": [
+        "The storage core is C++17, SQLite C API, std::filesystem, and a per-instance mutex. SQLite provides transaction isolation/recovery; the service's API is still key/value, not PostgreSQL SQL.",
+        "The legacy RESP server uses POSIX sockets and epoll with four workers; it remains Linux-oriented and is not yet safe for untrusted network access.",
+        "The new CMake test target covers binary/empty values, namespace separation, transaction rollback, backup/restore, restart, and concurrent calls; native compilation still needs to be run.",
+        "CMake and vcpkg define the Windows-capable storage build. RESP/HTTP, TLS, authentication, compression, and operational metrics are not yet implemented."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Benchmark and developer workflow",
+      "items": [
+        "The Part B shell benchmark checks that localhost:6379 is reachable, then runs redis-benchmark for SET/GET.",
+        "part-b/benchmark.sh varies requests (10k, 100k, 1M), connections (10, 100, 1000), and payloads (512, 1024 bytes); results are written under results/.",
+        "The shell benchmark still drives the legacy RESP server for SET/GET; its request/connection/payload matrix is not yet a production acceptance test.",
+        "Build the SQLite storage core with root CMake + vcpkg. Existing Makefiles are legacy Linux paths. README retains the prior redis-cli and Doxygen workflow."
+      ]
+    }
+  ]
+}

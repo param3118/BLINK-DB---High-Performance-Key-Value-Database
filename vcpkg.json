@@ -1,0 +1,8 @@
+{
+  "name": "blinkdb",
+  "version-string": "0.3.0",
+  "dependencies": [
+    "sqlite3",
+    "zstd"
+  ]
+}

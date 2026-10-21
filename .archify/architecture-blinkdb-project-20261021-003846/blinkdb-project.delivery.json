@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "06e58b8d-47c7-4703-beb6-6acf9ed78528",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "D:\\projects\\24CS60R65_deslab_project\\.archify\\architecture-blinkdb-project-20261021-003846\\candidate.json",
+  "output": "D:\\projects\\24CS60R65_deslab_project\\.archify\\architecture-blinkdb-project-20261021-003846\\blinkdb-project.html",
+  "specification": {
+    "sha256": "db15731ef685c6a25876a8206ca3ad12995420a1be5f7d2318c5f0529296de8a",
+    "bytes": 6980
+  },
+  "artifact": {
+    "sha256": "ae87d1912de31803eca579775a736d3329c667a572e44316a8cef2bcaa08d70b",
+    "bytes": 759926
+  }
+}

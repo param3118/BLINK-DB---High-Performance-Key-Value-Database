@@ -1,0 +1,21 @@
+services:
+  blinkdb:
+    image: ${BLINKDB_IMAGE:-blinkdb:local}
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      BLINKDB_DATA_DIR: /data
+      BLINKDB_BIND: 0.0.0.0
+      BLINKDB_TLS_CERT: /certs/server.crt
+      BLINKDB_TLS_KEY: /certs/server.key
+    ports:
+      - "127.0.0.1:6379:6379"
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - blinkdb-data:/data
+      - ./certs:/certs:ro
+
+volumes:
+  blinkdb-data:

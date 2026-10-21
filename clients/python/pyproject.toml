@@ -1,0 +1,12 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "blinkdb-client"
+version = "0.1.0"
+description = "Small Python RESP and HTTP clients for BlinkDB"
+requires-python = ">=3.11"
+
+[tool.setuptools]
+py-modules = ["blinkdb_client"]

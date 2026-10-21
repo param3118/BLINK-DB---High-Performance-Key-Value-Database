@@ -1,0 +1,40 @@
+# Python environments and generated files
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Build outputs
+build/
+dist/
+CMakeFiles/
+CMakeCache.txt
+Testing/
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dll
+*.exe
+part-a/bin/
+part-a/obj/
+
+# Local secrets, certificates, logs, and database data
+.env
+.env.*
+!.env.example
+certs/
+*.pem
+*.key
+*.log
+*.sqlite3*
+blinkdb-data/
+
+# Unidentified preserved local binary; not used by BlinkDB
+/server

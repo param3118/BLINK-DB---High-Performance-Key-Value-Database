@@ -1,0 +1,49 @@
+flowchart LR
+    subgraph Runtime["BlinkDB storage core + legacy Linux RESP service"]
+        Client["Redis-compatible client<br/>redis-cli / RESP client"]
+        Workers["TCP server<br/>4 std::thread workers<br/>port 6379 · non-blocking sockets"]
+        Epoll["Per-worker epoll loop<br/>accept → recv → buffer<br/>edge-triggered client events"]
+        Parser["RESP parser<br/>array of bulk strings<br/>whitespace fallback"]
+        Router{"Command + arity"}
+        Replies["RESP reply serialization<br/>sendAll(client_fd)"]
+        Engine["StorageEngine API<br/>dataset · binary key/value<br/>bounded values · write-batch transaction"]
+        SQLite[("blinkdb.sqlite3<br/>SQLite WAL · synchronous=FULL<br/>composite dataset/key index")]
+        Backup[("Backup file<br/>SQLite online backup API")]
+        Config["CONFIG GET<br/>hard-coded compatibility values"]
+        Ping["PING<br/>+PONG"]
+        Error["Unknown command / wrong arity<br/>RESP error"]
+
+        Client -->|"TCP :6379 · RESP request"| Workers
+        Workers -->|"accept + readable events"| Epoll
+        Epoll -->|"recv chunks"| Parser
+        Parser --> Router
+        Router -->|"SET key value"| Engine
+        Router -->|"GET key"| Engine
+        Router -->|"DEL key"| Engine
+        Router -->|"CONFIG GET key"| Config
+        Router -->|"PING"| Ping
+        Router -->|"otherwise"| Error
+        Engine -->|"result / status"| Replies
+        Config --> Replies
+        Ping --> Replies
+        Error --> Replies
+        Replies -->|"serialized response over client socket"| Client
+        Engine <-->|"prepared BLOB queries · indexed lookup"| SQLite
+        Engine -->|"BEGIN IMMEDIATE · atomic SET/DEL batch"| SQLite
+        Engine <-->|"consistent backup / restore"| Backup
+    end
+
+    subgraph TestAndPerf["Separate validation and performance tools"]
+        Harness["CMake storage test target<br/>binary/empty · datasets · transactions<br/>backup/restart · concurrent calls"]
+        Bench["part-b/benchmark.sh + redis-benchmark<br/>SET/GET · 10k/100k/1M requests<br/>10/100/1000 connections<br/>512/1024-byte payloads"]
+        Harness -->|"calls StorageEngine"| Engine
+        Bench -->|"localhost:6379 workload"| Workers
+    end
+
+    subgraph Build["Build and documentation"]
+        PartA["Root CMake + vcpkg<br/>C++17 · SQLite3"]
+        PartB["Legacy Makefiles<br/>Linux/POSIX server"]
+        Doxygen["Doxygen<br/>HTML + LaTeX/PDF"]
+        PartA -.->|"builds storage + tests"| Harness
+        PartB -.->|"legacy Linux build"| Workers
+    end
